@@ -1,0 +1,8 @@
+.git
+.gitignore
+README.md
+ARCHITECTURE.md
+coverage.out
+coverage.html
+*.test
+main_test.go 

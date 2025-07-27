@@ -15,7 +15,6 @@ import (
 
 const (
 	defaultPort = "8080"
-	defaultURL  = "https://example.com/rss.xml" // Override with RSS_URL env var
 	cacheTTL    = 5 * time.Minute
 )
 
@@ -38,39 +37,64 @@ type Item struct {
 	GUID        string `xml:"guid"`
 }
 
-type Cache struct {
+type CacheEntry struct {
 	data      string
 	timestamp time.Time
-	mu        sync.RWMutex
 }
 
-func (c *Cache) Get() (string, bool) {
+type Cache struct {
+	entries map[string]CacheEntry
+	mu      sync.RWMutex
+}
+
+func (c *Cache) Get(url string) (string, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	if time.Since(c.timestamp) > cacheTTL {
+	entry, exists := c.entries[url]
+	if !exists || time.Since(entry.timestamp) > cacheTTL {
 		return "", false
 	}
-	return c.data, true
+	return entry.data, true
 }
 
-func (c *Cache) Set(data string) {
+func (c *Cache) Set(url, data string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.data = data
-	c.timestamp = time.Now()
+	if c.entries == nil {
+		c.entries = make(map[string]CacheEntry)
+	}
+	c.entries[url] = CacheEntry{
+		data:      data,
+		timestamp: time.Now(),
+	}
 }
 
 var cache = &Cache{}
 
 func fetchRSS(url string) (*RSS, error) {
-	resp, err := http.Get(url)
+	log.Printf("Fetching RSS from: %s", url)
+
+	// Create request with proper headers
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	// Add headers to mimic a real browser
+	req.Header.Set("User-Agent", "RSS2ICal/1.0 (Go HTTP Client)")
+	req.Header.Set("Accept", "application/rss+xml, application/xml, text/xml, */*")
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("HTTP GET error: %v", err)
 		return nil, fmt.Errorf("failed to fetch RSS: %w", err)
 	}
 	defer resp.Body.Close()
 
+	log.Printf("RSS fetch status: %d", resp.StatusCode)
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("RSS fetch returned status: %d", resp.StatusCode)
 	}
@@ -138,8 +162,15 @@ func calendarHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get RSS URL from query parameter
+	rssURL := r.URL.Query().Get("url")
+	if rssURL == "" {
+		http.Error(w, "RSS URL required: use ?url=... parameter", http.StatusBadRequest)
+		return
+	}
+
 	// Check cache first
-	if cached, ok := cache.Get(); ok {
+	if cached, ok := cache.Get(rssURL); ok {
 		w.Header().Set("Content-Type", "text/calendar; charset=utf-8")
 		w.Header().Set("Cache-Control", "public, max-age=300")
 		w.WriteHeader(http.StatusOK)
@@ -148,14 +179,9 @@ func calendarHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fetch fresh data
-	rssURL := os.Getenv("RSS_URL")
-	if rssURL == "" {
-		rssURL = defaultURL
-	}
-
 	rss, err := fetchRSS(rssURL)
 	if err != nil {
-		log.Printf("Error fetching RSS: %v", err)
+		log.Printf("Error fetching RSS from %s: %v", rssURL, err)
 		http.Error(w, "Failed to fetch RSS feed", http.StatusInternalServerError)
 		return
 	}
@@ -168,7 +194,7 @@ func calendarHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Cache the result
-	cache.Set(ical)
+	cache.Set(rssURL, ical)
 
 	w.Header().Set("Content-Type", "text/calendar; charset=utf-8")
 	w.Header().Set("Cache-Control", "public, max-age=300")
@@ -189,13 +215,7 @@ func main() {
 	})
 
 	log.Printf("Starting RSS2ICal server on port %s", port)
-	log.Printf("Calendar endpoint: http://localhost:%s/calendar", port)
-
-	if rssURL := os.Getenv("RSS_URL"); rssURL != "" {
-		log.Printf("RSS URL: %s", rssURL)
-	} else {
-		log.Printf("Using default RSS URL (set RSS_URL env var to override)")
-	}
+	log.Printf("Calendar endpoint: http://localhost:%s/calendar?url=<RSS_URL>", port)
 
 	if err := http.ListenAndServe(":"+port, nil); err != nil {
 		log.Fatalf("Server failed to start: %v", err)

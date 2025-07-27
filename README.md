@@ -5,32 +5,44 @@ Lightweight Go service that converts RSS feeds to iCalendar format for consumpti
 ## Usage
 
 ```bash
-# Install dependencies
-go mod download
-
-# Run with default settings
+# Start the server
 go run main.go
 
-# Or set your RSS URL
-RSS_URL="https://your-rss-feed.com/feed.xml" go run main.go
+# Convert any RSS feed on-demand
+curl "http://localhost:8080/calendar?url=https://feeds.bbci.co.uk/news/rss.xml"
 
-# Custom port
-PORT=3000 RSS_URL="https://example.com/rss.xml" go run main.go
+# Use with calendar apps - just add this URL:
+# http://your-server:8080/calendar?url=https://your-rss-feed.com/feed.xml
 ```
 
 ## Endpoints
 
-- `GET /calendar` - Returns iCalendar data
+- `GET /calendar?url=<RSS_URL>` - Converts RSS feed to iCalendar format
 - `GET /health` - Health check
 
 ## Environment Variables
 
-- `RSS_URL` - RSS feed URL to convert
 - `PORT` - Server port (default: 8080)
 
 ## Features
 
-- In-memory caching (5min TTL)
+- Dynamic RSS URL via query parameter
+- Per-URL caching (5min TTL)
 - Concurrent-safe
-- Handles common RSS date formats
-- Proper HTTP headers for calendar apps 
+- Handles common RSS date formats  
+- Proper HTTP headers for calendar apps
+
+## Testing
+
+```bash
+# Run tests
+go test
+
+# Run tests with coverage
+go test -cover
+
+# Verbose test output
+go test -v
+```
+
+Test coverage: 77.4% of statements 
