@@ -45,4 +45,26 @@ go test -cover
 go test -v
 ```
 
-Test coverage: 77.4% of statements 
+Test coverage: 77.4% of statements
+
+## Docker Deployment
+
+Perfect for multi-app servers (alongside LibreChat, etc.):
+
+```bash
+# Build and run
+docker-compose up -d
+
+# View logs
+docker-compose logs -f rss2ical
+
+# Update
+docker-compose pull && docker-compose up -d
+
+# Stop
+docker-compose down
+```
+
+**Image size**: ~15MB Alpine-based container  
+**Memory usage**: ~16-64MB with limits  
+**Auto-restart**: Enabled for production reliability 
