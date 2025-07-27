@@ -208,6 +208,7 @@ func main() {
 		port = defaultPort
 	}
 
+	http.HandleFunc("/", homeHandler)
 	http.HandleFunc("/calendar", calendarHandler)
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -216,8 +217,193 @@ func main() {
 
 	log.Printf("Starting RSS2ICal server on port %s", port)
 	log.Printf("Calendar endpoint: http://localhost:%s/calendar?url=<RSS_URL>", port)
+	log.Printf("Home page: http://localhost:%s/", port)
 
 	if err := http.ListenAndServe(":"+port, nil); err != nil {
 		log.Fatalf("Server failed to start: %v", err)
 	}
+}
+
+func homeHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	html := `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RSS2ICal - Convert RSS to Calendar</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+            line-height: 1.6;
+            color: #333;
+        }
+        .container {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 0.5rem;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 2rem;
+        }
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+        input[type="url"] {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #e1e5e9;
+            border-radius: 4px;
+            font-size: 1rem;
+            box-sizing: border-box;
+        }
+        input[type="url"]:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 4px;
+            font-size: 1rem;
+            cursor: pointer;
+            margin-top: 1rem;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .result {
+            margin-top: 2rem;
+            padding: 1rem;
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 4px;
+            display: none;
+        }
+        .result.show {
+            display: block;
+        }
+        .url-output {
+            background: white;
+            padding: 0.75rem;
+            border-radius: 4px;
+            word-break: break-all;
+            font-family: monospace;
+            margin: 0.5rem 0;
+        }
+        .copy-btn {
+            background: #28a745;
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+        }
+        .copy-btn:hover {
+            background: #1e7e34;
+        }
+        .example {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 4px;
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+        .example h3 {
+            margin-top: 0;
+            color: #856404;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>RSS2ICal</h1>
+        <p class="subtitle">Convert any RSS feed to iCalendar format for Google Calendar, Apple Calendar, and more.</p>
+        
+        <form id="rssForm">
+            <label for="rssUrl">RSS Feed URL:</label>
+            <input 
+                type="url" 
+                id="rssUrl" 
+                name="rssUrl" 
+                placeholder="https://example.com/feed.rss"
+                required
+            >
+            <button type="submit">Generate Calendar URL</button>
+        </form>
+
+        <div id="result" class="result">
+            <h3>✅ Your Calendar URL:</h3>
+            <div id="calendarUrl" class="url-output"></div>
+            <button id="copyBtn" class="copy-btn">Copy URL</button>
+            <p><strong>Next steps:</strong></p>
+            <ul>
+                <li><strong>Google Calendar:</strong> Settings → Add Calendar → From URL → Paste the URL above</li>
+                <li><strong>Apple Calendar:</strong> File → New Calendar Subscription → Paste the URL above</li>
+            </ul>
+        </div>
+
+        <div class="example">
+            <h3>Example: SF Rec Parks Volunteer Events</h3>
+            <p>Try this RSS feed for SF Recreation & Parks volunteer events:</p>
+            <code>https://sfrecpark.org/RSSFeed.aspx?ModID=58&CID=Volunteer-Calendar-29</code>
+            <br><br>
+            <button onclick="fillExample()" style="background: #6c757d; padding: 0.5rem 1rem; font-size: 0.875rem;">Use This Example</button>
+        </div>
+    </div>
+
+    <script>
+        function fillExample() {
+            document.getElementById('rssUrl').value = 'https://sfrecpark.org/RSSFeed.aspx?ModID=58&CID=Volunteer-Calendar-29';
+        }
+
+        document.getElementById('rssForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const rssUrl = document.getElementById('rssUrl').value;
+            const baseUrl = window.location.origin;
+            const encodedUrl = encodeURIComponent(rssUrl);
+            const calendarUrl = baseUrl + '/calendar?url=' + encodedUrl;
+            
+            document.getElementById('calendarUrl').textContent = calendarUrl;
+            document.getElementById('result').classList.add('show');
+            
+            // Scroll to result
+            document.getElementById('result').scrollIntoView({ behavior: 'smooth' });
+        });
+
+        document.getElementById('copyBtn').addEventListener('click', function() {
+            const urlText = document.getElementById('calendarUrl').textContent;
+            navigator.clipboard.writeText(urlText).then(function() {
+                const btn = document.getElementById('copyBtn');
+                const originalText = btn.textContent;
+                btn.textContent = 'Copied!';
+                btn.style.background = '#20c997';
+                setTimeout(function() {
+                    btn.textContent = originalText;
+                    btn.style.background = '#28a745';
+                }, 2000);
+            });
+        });
+    </script>
+</body>
+</html>`
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(html))
 }

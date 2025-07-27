@@ -292,3 +292,83 @@ func parseRSSBytes(data []byte, rss *RSS) error {
 	}
 	return nil
 }
+
+func TestHomeHandler(t *testing.T) {
+	req := httptest.NewRequest("GET", "/", nil)
+	w := httptest.NewRecorder()
+
+	homeHandler(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", w.Code)
+	}
+
+	contentType := w.Header().Get("Content-Type")
+	if contentType != "text/html; charset=utf-8" {
+		t.Errorf("Expected Content-Type 'text/html; charset=utf-8', got '%s'", contentType)
+	}
+
+	body := w.Body.String()
+
+	// Check for key HTML elements
+	expectedElements := []string{
+		"<title>RSS2ICal - Convert RSS to Calendar</title>",
+		"<h1>RSS2ICal</h1>",
+		"<form id=\"rssForm\">",
+		"type=\"url\"",
+		"id=\"rssUrl\"",
+		"Generate Calendar URL",
+		"SF Rec Parks Volunteer Events",
+		"https://sfrecpark.org/RSSFeed.aspx?ModID=58&CID=Volunteer-Calendar-29",
+	}
+
+	for _, element := range expectedElements {
+		if !strings.Contains(body, element) {
+			t.Errorf("Expected HTML to contain '%s', but it was not found", element)
+		}
+	}
+}
+
+func TestHomeHandlerMethodNotAllowed(t *testing.T) {
+	methods := []string{"POST", "PUT", "DELETE", "PATCH"}
+
+	for _, method := range methods {
+		req := httptest.NewRequest(method, "/", nil)
+		w := httptest.NewRecorder()
+
+		homeHandler(w, req)
+
+		if w.Code != http.StatusMethodNotAllowed {
+			t.Errorf("Expected status 405 for %s method, got %d", method, w.Code)
+		}
+
+		body := strings.TrimSpace(w.Body.String())
+		if body != "Method not allowed" {
+			t.Errorf("Expected 'Method not allowed' error message for %s method, got '%s'", method, body)
+		}
+	}
+}
+
+func TestHomeHandlerJavaScriptFunctionality(t *testing.T) {
+	req := httptest.NewRequest("GET", "/", nil)
+	w := httptest.NewRecorder()
+
+	homeHandler(w, req)
+
+	body := w.Body.String()
+
+	// Check for JavaScript functionality
+	jsElements := []string{
+		"function fillExample()",
+		"encodeURIComponent(rssUrl)",
+		"'/calendar?url=' + encodedUrl",
+		"navigator.clipboard.writeText",
+		"getElementById('rssForm').addEventListener",
+	}
+
+	for _, element := range jsElements {
+		if !strings.Contains(body, element) {
+			t.Errorf("Expected JavaScript to contain '%s', but it was not found", element)
+		}
+	}
+}
