@@ -47,23 +47,67 @@ go test -v
 
 Test coverage: 77.4% of statements
 
-## Docker Deployment
+## Deployment
 
-Perfect for multi-app servers (alongside LibreChat, etc.):
+### Production Deployment (Recommended)
+
+Uses pre-built images from GitHub Actions - fast and lightweight:
 
 ```bash
-# Build and run
+# Deploy with pre-built image
+docker-compose -f docker-compose.prod.yml up -d
+
+# View logs
+docker-compose -f docker-compose.prod.yml logs -f rss2ical
+
+# Update to latest
+docker-compose -f docker-compose.prod.yml pull && docker-compose -f docker-compose.prod.yml up -d
+
+# Stop
+docker-compose -f docker-compose.prod.yml down
+```
+
+**Default port**: 8081 (external) → 8080 (internal)
+
+### Port Configuration
+
+To change the external port, edit `docker-compose.prod.yml`:
+```yaml
+ports:
+  - "9000:8080"  # Change 8081 → 9000, keep internal 8080
+```
+
+For nginx reverse proxy setup:
+```nginx
+# /etc/nginx/sites-available/rss.yourdomain.com
+server {
+    server_name rss.yourdomain.com;
+    location / {
+        proxy_pass http://localhost:8081;  # Match your external port
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+```
+
+### Development Deployment
+
+For local development with live building:
+
+```bash
+# Build and run locally
 docker-compose up -d
 
 # View logs
 docker-compose logs -f rss2ical
-
-# Update
-docker-compose pull && docker-compose up -d
-
-# Stop
-docker-compose down
 ```
+
+### CI/CD
+
+GitHub Actions automatically builds and pushes images on every commit to main:
+- **Image**: `ghcr.io/sachanganesh/rss2ical:latest`
+- **Build time**: ~2-3 minutes (vs 4+ minutes on small droplets)
+- **Free**: For public repositories
 
 **Image size**: ~15MB Alpine-based container  
 **Memory usage**: ~16-64MB with limits  
