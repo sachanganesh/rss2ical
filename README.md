@@ -4,20 +4,35 @@ Lightweight Go service that converts RSS feeds to iCalendar format for consumpti
 
 ## Usage
 
+### Web Interface (Recommended)
+
+Visit the home page in your browser to easily generate calendar URLs:
+
+```
+http://localhost:8080/
+```
+
+1. Paste any RSS feed URL 
+2. Click "Generate Calendar URL"
+3. Copy the generated URL
+4. Add to your calendar app
+
+### Direct API Usage
+
 ```bash
 # Start the server
 go run main.go
 
-# Convert any RSS feed on-demand
-curl "http://localhost:8080/calendar?url=https://feeds.bbci.co.uk/news/rss.xml"
+# Convert any RSS feed on-demand (URL must be properly encoded)
+curl "http://localhost:8080/calendar?url=https%3A//feeds.bbci.co.uk/news/rss.xml"
 
-# Use with calendar apps - just add this URL:
-# http://your-server:8080/calendar?url=https://your-rss-feed.com/feed.xml
+# For RSS URLs with query parameters, use the web interface or encode manually
 ```
 
 ## Endpoints
 
-- `GET /calendar?url=<RSS_URL>` - Converts RSS feed to iCalendar format
+- `GET /` - Home page with URL generation form
+- `GET /calendar?url=<ENCODED_RSS_URL>` - Converts RSS feed to iCalendar format
 - `GET /health` - Health check
 
 ## Environment Variables
@@ -26,11 +41,20 @@ curl "http://localhost:8080/calendar?url=https://feeds.bbci.co.uk/news/rss.xml"
 
 ## Features
 
-- Dynamic RSS URL via query parameter
-- Per-URL caching (5min TTL)
-- Concurrent-safe
-- Handles common RSS date formats  
-- Proper HTTP headers for calendar apps
+- **Web Interface**: Simple form to generate properly encoded calendar URLs
+- **Dynamic RSS URLs**: Support any RSS feed via query parameter
+- **Automatic URL Encoding**: JavaScript handles complex URLs with parameters
+- **Per-URL Caching**: 5-minute TTL for fast responses
+- **Concurrent-Safe**: Thread-safe cache operations
+- **Date Format Handling**: Supports common RSS date formats
+- **Calendar App Ready**: Proper HTTP headers for Google Calendar, Apple Calendar, etc.
+- **Copy-to-Clipboard**: One-click URL copying from web interface
+
+## Example RSS Feeds
+
+The web interface includes examples like:
+- SF Recreation & Parks volunteer events
+- Any RSS 2.0 compatible feed 
 
 ## Testing
 
@@ -45,7 +69,7 @@ go test -cover
 go test -v
 ```
 
-Test coverage: 77.4% of statements
+Test coverage: 85%+ of statements
 
 ## Deployment
 
